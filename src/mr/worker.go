@@ -5,7 +5,6 @@ import "log"
 import "net/rpc"
 import "hash/fnv"
 
-
 //
 // Map functions return a slice of KeyValue.
 //
@@ -24,7 +23,6 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-
 //
 // main/mrworker.go calls this function.
 //
@@ -34,7 +32,7 @@ func Worker(mapf func(string, string) []KeyValue,
 	// Your worker implementation here.
 
 	// uncomment to send the Example RPC to the coordinator.
-	// CallExample()
+	//CallExample()
 
 }
 
@@ -66,6 +64,10 @@ func CallExample() {
 		fmt.Printf("call failed!\n")
 	}
 }
+
+//func GetTask() string {
+//
+//}
 
 //
 // send an RPC request to the coordinator, wait for the response.

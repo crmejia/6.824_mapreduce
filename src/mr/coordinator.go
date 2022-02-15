@@ -6,10 +6,9 @@ import "os"
 import "net/rpc"
 import "net/http"
 
-
 type Coordinator struct {
 	// Your definitions here.
-
+	Tasks []Task
 }
 
 // Your code here -- RPC handlers for the worker to call.
@@ -24,6 +23,10 @@ func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	return nil
 }
 
+func (c *Coordinator) FetchTask(args *ExampleArgs, task *Task) error {
+	task.Filename = c.Tasks[0].Filename
+	return nil
+}
 
 //
 // start a thread that listens for RPCs from worker.go
@@ -50,7 +53,6 @@ func (c *Coordinator) Done() bool {
 
 	// Your code here.
 
-
 	return ret
 }
 
@@ -63,7 +65,6 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 
 	// Your code here.
-
 
 	c.server()
 	return &c

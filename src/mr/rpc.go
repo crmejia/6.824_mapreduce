@@ -21,11 +21,40 @@ type ExampleArgs struct {
 type ExampleReply struct {
 	Y int
 }
+type State int
+
+const (
+	StateIdle State = iota
+	StateInProgress
+	StateCompleted
+)
+
+var validState = map[State]bool{
+	StateIdle:       true,
+	StateInProgress: true,
+	StateCompleted:  true,
+}
+
+type TaskType int
+
+const (
+	TaskTypeMap TaskType = iota
+	TaskTypeReduce
+)
 
 // Add your RPC definitions here.
 type Task struct {
 	Filename string
-	//TODO type string either "map" or "reduce" use constants
+	state    State
+	//TaskID int this might need to be set at some point to coordinate workers properly
+	//for the moment setting a taskID to be used as the
+	TaskID   int
+	TaskType TaskType
+	WorkerID int
+}
+
+func (t Task) State() State {
+	return t.state
 }
 
 // Cook up a unique-ish UNIX-domain socket name

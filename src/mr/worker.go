@@ -39,18 +39,22 @@ func Worker(mapf func(string, string) []KeyValue,
 
 	// Your worker implementation here.
 	var err error
+	log.Println("registering worker")
 	workerID, err = CallRegisterWorker()
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		return
 	}
 	for {
+		log.Println("fetching task")
 		task, err := CallFetchTask()
 		if err != nil { //as per the hint this might mean that the work is done and workers can exit
+			//TODO maybe not return but sleep?
 			fmt.Println(err.Error())
 			return
 		}
 		if task.TaskType == TaskTypeMap {
+			log.Println("starting map task")
 			//open file into a content and close
 			contents := LoadFile(task.Filename)
 			//call map on content
@@ -72,6 +76,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				}
 			}
 		}
+		log.Println("completing task")
 		err = CallCompleteTask(task)
 		if err != nil {
 			// Assume the worker took too long. Try to Re-register
@@ -80,7 +85,6 @@ func Worker(mapf func(string, string) []KeyValue,
 				//assume the coordinator is Done, exit
 				return
 			}
-
 		}
 	}
 }
@@ -115,7 +119,7 @@ func CallExample() {
 
 func CallRegisterWorker() (int, error) {
 	var id int
-	ok := call("Coordinator.RegisterWorker", nil, &id)
+	ok := call("Coordinator.RegisterWorker", ExampleArgs{}, &id)
 	if ok {
 		return id, nil
 	}

@@ -3,6 +3,7 @@ package mr_test
 import (
 	"6.824/mr"
 	"testing"
+	"time"
 )
 
 func TestFetchTask(t *testing.T) {
@@ -179,5 +180,30 @@ func TestRegisterWorker(t *testing.T) {
 }
 
 //func TestCoordinator loops over tasks and "resets" long running task to idle
+func TestCoordinatorResetsStaleTask(t *testing.T) {
+	workerID := 14
+	coordinator := mr.Coordinator{
+		Tasks: []mr.Task{
+			mr.Task{
+				TaskID:   0,
+				TaskType: mr.TaskTypeReduce,
+			},
+		},
+		Workers: map[int]bool{workerID: true},
+	}
+	task := mr.Task{}
+	coordinator.FetchTask(workerID, &task) //set task to in progress
+	coordinator.Tasks[0].StartTime = time.Date(2022, time.January, 1, 10, 10, 10, 10, time.UTC)
+	coordinator.CheckTask()
+	want := mr.StateIdle
+	got := coordinator.Tasks[0].State()
+	if want != got {
+		t.Errorf("want task to have an Idle state, got %d", got)
+	}
+}
+
+//test that workers are removed if an assigned task doesn't return. Just like TestCoordinatorResetsStaleTask
+// the proble is that there could be a collision if the id is reassigned
+// and the old workers comes back.
 
 //test coordinator sets filename of reduce task

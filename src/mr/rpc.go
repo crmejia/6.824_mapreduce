@@ -6,7 +6,10 @@ package mr
 // remember to capitalize all names.
 //
 
-import "os"
+import (
+	"os"
+	"time"
+)
 import "strconv"
 
 //
@@ -48,9 +51,10 @@ type Task struct {
 	state    State
 	//TaskID int this might need to be set at some point to coordinate workers properly
 	//for the moment setting a taskID to be used as the
-	TaskID   int
-	TaskType TaskType
-	WorkerID int
+	TaskID    int
+	TaskType  TaskType
+	WorkerID  int
+	StartTime time.Time
 }
 
 func (t Task) State() State {

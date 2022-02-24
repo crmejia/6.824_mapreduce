@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 )
 import "net"
@@ -16,6 +17,7 @@ type Coordinator struct {
 	// Your definitions here.
 	Tasks   []Task
 	Workers map[int]bool
+	mu      sync.Mutex
 	//ReduceTask []Task
 }
 
@@ -31,19 +33,39 @@ func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	return nil
 }
 
+//will break if >99 workers are registered
+func (c *Coordinator) RegisterWorker(args ExampleArgs, reply *int) error {
+	rand.Seed(time.Now().UnixNano())
+	var id int
+	//generate random id between 1 and 99
+	for id == 0 && !c.Workers[id] {
+		id = rand.Intn(99) + 1
+	}
+
+	*reply = id
+	c.mu.Lock()
+	c.Workers[id] = true
+	c.mu.Unlock()
+	return nil
+}
+
 func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 	//verify workers exists if not fail, workers are not allowed to self-assign
 	if !c.Workers[workerID] {
 		return errors.New("unregistered ID, please call RegisterWorker")
 	}
-
+	//TODO do not asssing a reduce task until all map task are completed
 	for i, t := range c.Tasks {
 		if t.State() == StateIdle {
 			//TODO having to "copy" values manually is annoying, is there a better way
 			task.Filename = t.Filename
 			task.TaskID = t.TaskID
+			task.WorkerID = workerID
+			task.TaskType = t.TaskType
+			c.mu.Lock()
 			c.Tasks[i].WorkerID = workerID
 			c.Tasks[i].state = StateInProgress
+			c.mu.Unlock()
 			return nil
 		}
 	}
@@ -84,9 +106,15 @@ func (c *Coordinator) server() {
 // if the entire job has finished.
 //
 func (c *Coordinator) Done() bool {
-	ret := false
+	ret := true
 
 	// Your code here.
+	for _, t := range c.Tasks {
+		if t.state != StateCompleted {
+			ret = false
+			break
+		}
+	}
 
 	return ret
 }
@@ -113,19 +141,32 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	}
 	fmt.Println("coordinator created")
 	c.server()
+	go c.checkTask()
 	return &c
 }
 
-//will break if >99 workers are registered
-func (c *Coordinator) RegisterWorker(args ExampleArgs, reply *int) error {
-	rand.Seed(time.Now().UnixNano())
-	var id int
-	//generate random id between 1 and 99
-	for id == 0 {
-		id = rand.Intn(99) + 1
+//this is an interesting case for testing. This is an infinite loop that sleeps forever
+//my solution was to separate the actual logic from the infinite loop.
+func (c *Coordinator) checkTask() {
+	for {
+		c.CheckTask()
+		time.Sleep(30 * time.Second)
 	}
+}
 
-	*reply = id
-	c.Workers[id] = true
-	return nil
+//loop over in progress task and reset long running jobs
+func (c *Coordinator) CheckTask() {
+	for i, t := range c.Tasks {
+		if t.state == StateInProgress {
+			now := time.Now()
+			elapsed := now.Sub(t.StartTime)
+			if elapsed > (10 * time.Minute) {
+				//resetting task
+				c.mu.Lock()
+				//t.state = StateIdle doesn't modify
+				c.Tasks[i].state = StateIdle
+				c.mu.Unlock()
+			}
+		}
+	}
 }

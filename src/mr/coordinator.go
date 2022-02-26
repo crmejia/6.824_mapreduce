@@ -54,7 +54,7 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 	if !c.Workers[workerID] {
 		return errors.New("unregistered ID, please call RegisterWorker")
 	}
-	//TODO do not asssing a reduce task until all map task are completed
+	//TODO do not assign a reduce task until all map task are completed
 	for i, t := range c.Tasks {
 		if t.State() == StateIdle {
 			//TODO having to "copy" values manually is annoying, is there a better way
@@ -62,6 +62,7 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 			task.TaskID = t.TaskID
 			task.WorkerID = workerID
 			task.TaskType = t.TaskType
+			task.NReduce = t.NReduce
 			c.mu.Lock()
 			c.Tasks[i].WorkerID = workerID
 			c.Tasks[i].state = StateInProgress
@@ -122,7 +123,7 @@ func (c *Coordinator) Done() bool {
 //
 // create a Coordinator.
 // main/mrcoordinator.go calls this function.
-// nReduce is the number of reduce Tasks to use.
+// NReduce is the number of reduce Tasks to use.
 //
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
@@ -134,6 +135,7 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 		c.Tasks[i].Filename = files[i]
 		c.Tasks[i].TaskID = i
 		c.Tasks[i].TaskType = TaskTypeMap
+		c.Tasks[i].NReduce = nReduce
 	}
 
 	for _, t := range c.Tasks[len(files):] {

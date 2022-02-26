@@ -13,7 +13,7 @@ func TestFetchTask(t *testing.T) {
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		Tasks: []mr.Task{
-			mr.Task{Filename: want},
+			{Filename: want},
 		},
 	}
 	task := mr.Task{}
@@ -33,7 +33,7 @@ func TestFetchTaskNoMoreTaskAvailableReturnsError(t *testing.T) {
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		Tasks: []mr.Task{
-			mr.Task{},
+			{},
 		},
 	}
 	task := mr.Task{}
@@ -50,8 +50,8 @@ func TestFetchTaskSetsTaskID(t *testing.T) {
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		Tasks: []mr.Task{
-			mr.Task{TaskID: 0},
-			mr.Task{TaskID: 1},
+			{TaskID: 0},
+			{TaskID: 1},
 		},
 	}
 	task := mr.Task{}
@@ -89,7 +89,7 @@ func TestCompleteTaskSetsStateCompleted(t *testing.T) {
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		Tasks: []mr.Task{
-			mr.Task{WorkerID: workerID},
+			{WorkerID: workerID},
 		},
 	}
 	task := mr.Task{WorkerID: workerID}
@@ -110,7 +110,7 @@ func TestCompleteTaskFailsForWrongWorker(t *testing.T) {
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		Tasks: []mr.Task{
-			mr.Task{WorkerID: workerID},
+			{WorkerID: workerID},
 		},
 	}
 	task := mr.Task{}                      //worker ID not set
@@ -184,7 +184,7 @@ func TestCoordinatorResetsStaleTask(t *testing.T) {
 	workerID := 14
 	coordinator := mr.Coordinator{
 		Tasks: []mr.Task{
-			mr.Task{
+			{
 				TaskID:   0,
 				TaskType: mr.TaskTypeReduce,
 			},

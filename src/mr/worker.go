@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"sort"
 )
 import "log"
 import "net/rpc"
@@ -53,28 +55,28 @@ func Worker(mapf func(string, string) []KeyValue,
 			fmt.Println(err.Error())
 			return
 		}
+
+		contents := LoadFile(task.Filename)
 		if task.TaskType == TaskTypeMap {
-			log.Println("starting map task")
+			log.Printf("starting map task %d\n", task.TaskID)
 			//open file into a content and close
-			contents := LoadFile(task.Filename)
 			//call map on content
 			intermediate := MapFile(task.Filename, contents, mapf)
-
-			//TODO write intermediate to files as specified buckets
-			oname := fmt.Sprintf("IM_%d", task.TaskID)
-			ofile, err := os.Create(oname)
-			if err != nil {
-				fmt.Println(err.Error())
-				return
-			}
-			defer ofile.Close()
-
-			enc := json.NewEncoder(ofile)
-			for _, kv := range intermediate {
-				if err := enc.Encode(kv); err != nil {
-					log.Fatal(err.Error())
+			sort.Sort(ByKey(intermediate))
+			buckets := HashIntermediates(task.NReduce, intermediate)
+			for i, bucket := range buckets {
+				oname := fmt.Sprintf("mr-%d-%d", task.TaskID, i) //mr-X-Y
+				//TODO todo use tmpfile os.CreateTemp then rename
+				ofile, err := os.Create(oname)
+				if err != nil {
+					fmt.Println(err.Error())
+					return
 				}
+				defer ofile.Close()
+				WriteReduceFiles(bucket, ofile)
 			}
+		} else { //reduce task
+			log.Printf("starting reduce task \n")
 		}
 		log.Println("completing task")
 		err = CallCompleteTask(task)
@@ -184,4 +186,26 @@ func LoadFile(filename string) string {
 
 func MapFile(filename, contents string, mapf func(string, string) []KeyValue) []KeyValue {
 	return mapf(filename, contents)
+}
+
+func HashIntermediates(nReduce int, intermediate []KeyValue) [][]KeyValue {
+	hashedIm := make([][]KeyValue, nReduce)
+	//for i, _ := range hashedIm {
+	//	hashedIm[i] := make([]KeyValue, 0)
+	//}
+	for _, v := range intermediate {
+		targetBucket := ihash(v.Key) % nReduce
+		hashedIm[targetBucket] = append(hashedIm[targetBucket], v)
+	}
+	return hashedIm
+}
+
+func WriteReduceFiles(bucket []KeyValue, w io.Writer) error {
+	enc := json.NewEncoder(w)
+	for _, kv := range bucket {
+		if err := enc.Encode(kv); err != nil {
+			log.Fatal(err.Error())
+		}
+	}
+	return nil
 }

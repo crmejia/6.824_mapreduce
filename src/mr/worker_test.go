@@ -85,3 +85,17 @@ func TestMapTaskCreatesNReduceFiles(t *testing.T) {
 }
 
 //TODO test CreateReduceFileError
+func TestLoadReduceFileIntoIntermediate(t *testing.T) {
+
+	want := []mr.KeyValue{
+		{Key: "0", Value: "0"},
+		{Key: "1", Value: "1"},
+	}
+	validJSON := []byte("{\"Key\":\"0\",\"Value\":\"0\"}\n{\"Key\":\"1\",\"Value\":\"1\"}\n")
+	buffer := bytes.Buffer{}
+	buffer.Write(validJSON)
+	got := mr.ReadReduceFile(&buffer)
+	if !cmp.Equal(want, got) {
+		t.Errorf("want %q, got %q", want, got)
+	}
+}

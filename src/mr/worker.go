@@ -56,9 +56,9 @@ func Worker(mapf func(string, string) []KeyValue,
 			return
 		}
 
-		contents := LoadFile(task.Filename)
 		if task.TaskType == TaskTypeMap {
 			log.Printf("starting map task %d\n", task.TaskID)
+			contents := LoadFile(task.Filename)
 			//open file into a content and close
 			//call map on content
 			intermediate := MapFile(task.Filename, contents, mapf)
@@ -77,6 +77,10 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 		} else { //reduce task
 			log.Printf("starting reduce task \n")
+			//TODO load nReduce files
+
+			//TODO iterate over all similar keys then reduce
+			//TODO write keys to output files on each iteration
 		}
 		log.Println("completing task")
 		err = CallCompleteTask(task)
@@ -188,6 +192,10 @@ func MapFile(filename, contents string, mapf func(string, string) []KeyValue) []
 	return mapf(filename, contents)
 }
 
+func ReduceFile(key string, values []string, reducef func(string, []string) string) string {
+	return reducef(key, values)
+}
+
 func HashIntermediates(nReduce int, intermediate []KeyValue) [][]KeyValue {
 	hashedIm := make([][]KeyValue, nReduce)
 	//for i, _ := range hashedIm {
@@ -208,4 +216,19 @@ func WriteReduceFiles(bucket []KeyValue, w io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func ReadReduceFile(r io.Reader) []KeyValue {
+	dec := json.NewDecoder(r)
+	bucket := []KeyValue{}
+	for {
+		kv := KeyValue{}
+		if err := dec.Decode(&kv); err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		bucket = append(bucket, kv)
+	}
+	return bucket
 }

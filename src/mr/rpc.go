@@ -48,19 +48,21 @@ const (
 // Add your RPC definitions here.
 type Task struct {
 	Filename string
-	state    State
+	State    State
 	//TaskID int this might need to be set at some point to coordinate workers properly
 	//for the moment setting a taskID to be used as the
 	TaskID    int
 	TaskType  TaskType
 	WorkerID  int
 	StartTime time.Time
+	MMap      int
 	NReduce   int
 }
 
-func (t Task) State() State {
-	return t.state
-}
+//
+//func (t Task) State() State {
+//	return t.State
+//}
 
 //func (t Task) NReduce() int {
 //	return t.NReduce

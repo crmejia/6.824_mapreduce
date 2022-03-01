@@ -15,9 +15,10 @@ import "net/http"
 
 type Coordinator struct {
 	// Your definitions here.
-	Tasks   []Task
-	Workers map[int]bool
-	mu      sync.Mutex
+	MapTasks   []Task
+	ReduceTask []Task
+	Workers    map[int]bool
+	mu         sync.Mutex
 	//ReduceTask []Task
 }
 
@@ -54,9 +55,9 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 	if !c.Workers[workerID] {
 		return errors.New("unregistered ID, please call RegisterWorker")
 	}
-	//TODO do not assign a reduce task until all map task are completed
-	for i, t := range c.Tasks {
-		if t.State() == StateIdle {
+	mapDone := true //flag that marks if map task are done
+	for i, t := range c.MapTasks {
+		if t.State == StateIdle {
 			//TODO having to "copy" values manually is annoying, is there a better way
 			task.Filename = t.Filename
 			task.TaskID = t.TaskID
@@ -64,24 +65,43 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 			task.TaskType = t.TaskType
 			task.NReduce = t.NReduce
 			c.mu.Lock()
-			c.Tasks[i].WorkerID = workerID
-			c.Tasks[i].state = StateInProgress
+			c.MapTasks[i].WorkerID = workerID
+			c.MapTasks[i].State = StateInProgress
+			c.mu.Unlock()
+			return nil
+		} else if t.State == StateInProgress {
+			mapDone = false
+		}
+	}
+
+	for i, t := range c.ReduceTask {
+		if t.State == StateIdle && mapDone {
+			//TODO having to "copy" values manually is annoying, is there a better way
+			task.Filename = t.Filename
+			task.TaskID = t.TaskID
+			task.WorkerID = workerID
+			task.TaskType = t.TaskType
+			task.NReduce = t.NReduce
+			c.mu.Lock()
+			c.ReduceTask[i].WorkerID = workerID
+			c.ReduceTask[i].State = StateInProgress
 			c.mu.Unlock()
 			return nil
 		}
 	}
+
 	return errors.New("no idle task")
 }
 
 func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
-	task := &c.Tasks[completedTask.TaskID]
+	task := &c.MapTasks[completedTask.TaskID]
 	if task.WorkerID != completedTask.WorkerID {
 		return fmt.Errorf("only assigned worker can complete task")
 	}
-	if task.State() != StateInProgress {
+	if task.State != StateInProgress {
 		return fmt.Errorf("only a task InProgress can be marked completed")
 	}
-	task.state = StateCompleted
+	task.State = StateCompleted
 	return nil
 
 }
@@ -110,8 +130,8 @@ func (c *Coordinator) Done() bool {
 	ret := true
 
 	// Your code here.
-	for _, t := range c.Tasks {
-		if t.state != StateCompleted {
+	for _, t := range c.MapTasks {
+		if t.State != StateCompleted {
 			ret = false
 			break
 		}
@@ -123,23 +143,28 @@ func (c *Coordinator) Done() bool {
 //
 // create a Coordinator.
 // main/mrcoordinator.go calls this function.
-// NReduce is the number of reduce Tasks to use.
+// NReduce is the number of reduce MapTasks to use.
 //
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 	// Your code here.
-	numberOfTasks := len(files) + nReduce
-	c.Tasks = make([]Task, numberOfTasks)
+	mMap := len(files)
+	c.MapTasks = make([]Task, mMap)
 	c.Workers = make(map[int]bool)
-	for i := range files {
-		c.Tasks[i].Filename = files[i]
-		c.Tasks[i].TaskID = i
-		c.Tasks[i].TaskType = TaskTypeMap
-		c.Tasks[i].NReduce = nReduce
+	for i := range c.MapTasks {
+		c.MapTasks[i].TaskType = TaskTypeMap
+		c.MapTasks[i].TaskID = i
+		c.MapTasks[i].MMap = mMap
+		c.MapTasks[i].NReduce = nReduce
+		c.MapTasks[i].Filename = files[i]
 	}
 
-	for _, t := range c.Tasks[len(files):] {
-		t.TaskType = TaskTypeReduce
+	c.ReduceTask = make([]Task, nReduce)
+	for i := range c.ReduceTask {
+		c.ReduceTask[i].TaskType = TaskTypeReduce
+		c.ReduceTask[i].TaskID = i
+		c.ReduceTask[i].MMap = mMap
+		c.ReduceTask[i].NReduce = nReduce
 	}
 	fmt.Println("coordinator created")
 	c.server()
@@ -158,15 +183,15 @@ func (c *Coordinator) checkTask() {
 
 //loop over in progress task and reset long running jobs
 func (c *Coordinator) CheckTask() {
-	for i, t := range c.Tasks {
-		if t.state == StateInProgress {
+	for i, t := range c.MapTasks {
+		if t.State == StateInProgress {
 			now := time.Now()
 			elapsed := now.Sub(t.StartTime)
 			if elapsed > (10 * time.Minute) {
 				//resetting task
 				c.mu.Lock()
-				//t.state = StateIdle doesn't modify
-				c.Tasks[i].state = StateIdle
+				//t.State = StateIdle doesn't modify
+				c.MapTasks[i].State = StateIdle
 				c.mu.Unlock()
 			}
 		}

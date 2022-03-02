@@ -147,7 +147,6 @@ func TestCompleteTaskFailsForWrongWorker(t *testing.T) {
 }
 
 func TestCompleteTaskFailsForNonInProgressState(t *testing.T) {
-
 	coordinator := mr.Coordinator{
 		Workers:  map[int]bool{workerID: true},
 		MapTasks: []mr.Task{{WorkerID: workerID, State: mr.StateIdle}},

@@ -111,7 +111,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				for k := i; k < j; k++ {
 					values = append(values, intermediate[k].Value)
 				}
-				//TODO delete intermediate files if task was succcesful
+				//TODO delete intermediate files if task was successful
 				output := reducef(intermediate[i].Key, values)
 				//write keys to output files on each iteration
 				fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)

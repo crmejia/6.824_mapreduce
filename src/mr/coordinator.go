@@ -76,11 +76,11 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 
 	for i, t := range c.ReduceTask {
 		if t.State == StateIdle && mapDone {
-			//TODO having to "copy" values manually is annoying, is there a better way
 			task.Filename = t.Filename
 			task.TaskID = t.TaskID
 			task.WorkerID = workerID
 			task.TaskType = t.TaskType
+			task.MMap = t.MMap
 			task.NReduce = t.NReduce
 			c.mu.Lock()
 			c.ReduceTask[i].WorkerID = workerID
@@ -137,7 +137,7 @@ func (c *Coordinator) Done() bool {
 	ret := true
 
 	// Your code here.
-	for _, t := range c.MapTasks {
+	for _, t := range c.ReduceTask {
 		if t.State != StateCompleted {
 			ret = false
 			break

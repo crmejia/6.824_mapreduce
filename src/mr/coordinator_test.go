@@ -107,18 +107,20 @@ func TestFetchTaskReturnsReduceTaskIfAllMapTaskAreCompleted(t *testing.T) {
 func TestCompleteTaskSetsStateCompleted(t *testing.T) {
 	want := mr.StateCompleted
 	coordinator := mr.Coordinator{
-		Workers: map[int]bool{workerID: true},
-		MapTasks: []mr.Task{
-			{WorkerID: workerID},
-		},
+		Workers:    map[int]bool{workerID: true},
+		MapTasks:   []mr.Task{{WorkerID: workerID, State: mr.StateInProgress}},
+		ReduceTask: []mr.Task{{WorkerID: workerID, State: mr.StateInProgress}},
 	}
-	task := mr.Task{WorkerID: workerID}
-	coordinator.FetchTask(workerID, &task) //coordinator sets task to inprogress
-	err := coordinator.CompleteTask(task, nil)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	task := mr.Task{WorkerID: workerID, TaskType: mr.TaskTypeMap}
+	coordinator.CompleteTask(task, nil)
 	got := coordinator.MapTasks[0].State
+	if want != got {
+		t.Errorf("want Task.StateCompleted %d, got State %d", want, got)
+	}
+
+	task.TaskType = mr.TaskTypeReduce
+	coordinator.CompleteTask(task, nil)
+	got = coordinator.ReduceTask[0].State
 	if want != got {
 		t.Errorf("want Task.StateCompleted %d, got State %d", want, got)
 	}
@@ -141,6 +143,19 @@ func TestCompleteTaskFailsForWrongWorker(t *testing.T) {
 	got := coordinator.MapTasks[0].State
 	if want != got {
 		t.Errorf("want Task.StateInProgress %d, got State %d", want, got)
+	}
+}
+
+func TestCompleteTaskFailsForNonInProgressState(t *testing.T) {
+
+	coordinator := mr.Coordinator{
+		Workers:  map[int]bool{workerID: true},
+		MapTasks: []mr.Task{{WorkerID: workerID, State: mr.StateIdle}},
+	}
+	task := mr.Task{WorkerID: workerID}
+	err := coordinator.CompleteTask(task, nil)
+	if err == nil {
+		t.Errorf("want error if worker call CompleteTask a task that is not InProgress, got nil")
 	}
 }
 func TestMakeCoordinator(t *testing.T) {

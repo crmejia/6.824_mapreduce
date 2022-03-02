@@ -94,7 +94,13 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 }
 
 func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
-	task := &c.MapTasks[completedTask.TaskID]
+	var task *Task
+	if completedTask.TaskType == TaskTypeMap {
+		task = &c.MapTasks[completedTask.TaskID]
+
+	} else { //reduce tasks
+		task = &c.ReduceTask[completedTask.TaskID]
+	}
 	if task.WorkerID != completedTask.WorkerID {
 		return fmt.Errorf("only assigned worker can complete task")
 	}
@@ -102,6 +108,7 @@ func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
 		return fmt.Errorf("only a task InProgress can be marked completed")
 	}
 	task.State = StateCompleted
+	//c.MapTasks[completedTask.TaskID].State = StateCompleted
 	return nil
 
 }

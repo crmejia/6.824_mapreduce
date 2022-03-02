@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"time"
 )
 import "log"
 import "net/rpc"
@@ -52,7 +53,9 @@ func Worker(mapf func(string, string) []KeyValue,
 		task, err := CallFetchTask()
 		if err != nil { //as per the hint this might mean that the work is done and workers can exit
 			//TODO maybe not return but sleep?
-			fmt.Println(err.Error())
+			time.Sleep(time.Second)
+			//the only errors from fetch task are unregistered worker and no idle task atm
+			//fmt.Println(err.Error())
 			return
 		}
 
@@ -76,11 +79,44 @@ func Worker(mapf func(string, string) []KeyValue,
 				WriteReduceFiles(bucket, ofile)
 			}
 		} else { //reduce task
-			log.Printf("starting reduce task \n")
-			//TODO load nReduce files
+			log.Printf("starting reduce task %d\n", task.TaskID)
+			//load nReduce files
+			intermediate := []KeyValue{}
+			for i := 0; i < task.MMap; i++ {
+				iname := fmt.Sprintf("mr-%d-%d", i, task.TaskID)
+				ifile, err := os.Open(iname)
+				defer ifile.Close()
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
+				bucket := ReadReduceFile(ifile)
+				intermediate = append(intermediate, bucket...)
+			}
 
-			//TODO iterate over all similar keys then reduce
-			//TODO write keys to output files on each iteration
+			oname := fmt.Sprintf("mr-out-%d", task.TaskID)
+			ofile, err := os.Create(oname)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			defer ofile.Close()
+			//iterate over all similar keys then reduce
+			for i := 0; i < len(intermediate); {
+				j := i + 1
+				for ; j < len(intermediate) && intermediate[j].Key == intermediate[i].Key; j++ {
+
+				}
+				values := []string{}
+				for k := i; k < j; k++ {
+					values = append(values, intermediate[k].Value)
+				}
+				//TODO delete intermediate files if task was succcesful
+				output := reducef(intermediate[i].Key, values)
+				//write keys to output files on each iteration
+				fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
+				i = j
+			}
 		}
 		log.Println("completing task")
 		err = CallCompleteTask(task)
@@ -192,9 +228,9 @@ func MapFile(filename, contents string, mapf func(string, string) []KeyValue) []
 	return mapf(filename, contents)
 }
 
-func ReduceFile(key string, values []string, reducef func(string, []string) string) string {
-	return reducef(key, values)
-}
+//func ReduceFile(key string, values []string, reducef func(string, []string) string) string {
+//	return reducef(key, values)
+//}
 
 func HashIntermediates(nReduce int, intermediate []KeyValue) [][]KeyValue {
 	hashedIm := make([][]KeyValue, nReduce)

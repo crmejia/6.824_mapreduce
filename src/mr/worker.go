@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/rpc"
 	"os"
 	"sort"
 	"time"
 )
 import "log"
-import "net/rpc"
 import "hash/fnv"
 
 //
@@ -39,17 +39,14 @@ var workerID int
 //
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
-
 	// Your worker implementation here.
 	var err error
-	log.Println("registering worker")
 	workerID, err = CallRegisterWorker()
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
 	for {
-		log.Println("fetching task")
 		task, err := CallFetchTask()
 		if err != nil { //as per the hint this might mean that the work is done and workers can exit
 			//TODO maybe not return but sleep?
@@ -60,65 +57,11 @@ func Worker(mapf func(string, string) []KeyValue,
 		}
 
 		if task.TaskType == TaskTypeMap {
-			log.Printf("starting map task %d\n", task.TaskID)
-			contents := LoadFile(task.Filename)
-			//open file into a content and close
-			//call map on content
-			intermediate := MapFile(task.Filename, contents, mapf)
-			sort.Sort(ByKey(intermediate))
-			buckets := HashIntermediates(task.NReduce, intermediate)
-			for i, bucket := range buckets {
-				oname := fmt.Sprintf("mr-%d-%d", task.TaskID, i) //mr-X-Y
-				//TODO todo use tmpfile os.CreateTemp then rename
-				ofile, err := os.Create(oname)
-				if err != nil {
-					fmt.Println(err.Error())
-					return
-				}
-				defer ofile.Close()
-				WriteReduceFiles(bucket, ofile)
-			}
+			mapTask(task, mapf)
 		} else { //reduce task
-			log.Printf("starting reduce task %d\n", task.TaskID)
-			//load nReduce files
-			intermediate := []KeyValue{}
-			for i := 0; i < task.MMap; i++ {
-				iname := fmt.Sprintf("mr-%d-%d", i, task.TaskID)
-				ifile, err := os.Open(iname)
-				defer ifile.Close()
-				if err != nil {
-					fmt.Println(err.Error())
-					return
-				}
-				bucket := ReadReduceFile(ifile)
-				intermediate = append(intermediate, bucket...)
-			}
-
-			oname := fmt.Sprintf("mr-out-%d", task.TaskID)
-			ofile, err := os.Create(oname)
-			if err != nil {
-				fmt.Println(err.Error())
-				return
-			}
-			defer ofile.Close()
-			//iterate over all similar keys then reduce
-			for i := 0; i < len(intermediate); {
-				j := i + 1
-				for ; j < len(intermediate) && intermediate[j].Key == intermediate[i].Key; j++ {
-
-				}
-				values := []string{}
-				for k := i; k < j; k++ {
-					values = append(values, intermediate[k].Value)
-				}
-				//TODO delete intermediate files if task was successful
-				output := reducef(intermediate[i].Key, values)
-				//write keys to output files on each iteration
-				fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
-				i = j
-			}
+			reduceTask(task, reducef)
 		}
-		log.Println("completing task")
+
 		err = CallCompleteTask(task)
 		if err != nil {
 			// Assume the worker took too long. Try to Re-register
@@ -128,6 +71,69 @@ func Worker(mapf func(string, string) []KeyValue,
 				return
 			}
 		}
+	}
+}
+
+func mapTask(task Task, mapf func(string, string) []KeyValue) {
+	log.Printf("starting map task %d\n", task.TaskID)
+	contents := LoadFile(task.Filename)
+	//open file into a content and close
+	//call map on content
+	//intermediate := MapFile(task.Filename, contents, mapf)
+	intermediate := mapf(task.Filename, contents)
+	sort.Sort(ByKey(intermediate))
+	buckets := HashIntermediates(task.NReduce, intermediate)
+	for i, bucket := range buckets {
+		oname := fmt.Sprintf("mr-%d-%d", task.TaskID, i) //mr-X-Y
+		//TODO todo use tmpfile os.CreateTemp then rename
+		ofile, err := os.Create(oname)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer ofile.Close()
+		WriteReduceFiles(bucket, ofile)
+	}
+}
+
+func reduceTask(task Task, reducef func(string, []string) string) {
+	log.Printf("starting reduce task %d\n", task.TaskID)
+	//load nReduce files
+	intermediate := []KeyValue{}
+	for i := 0; i < task.MMap; i++ {
+		iname := fmt.Sprintf("mr-%d-%d", i, task.TaskID)
+		ifile, err := os.Open(iname)
+		defer ifile.Close()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		bucket := ReadReduceFile(ifile)
+		intermediate = append(intermediate, bucket...)
+	}
+
+	oname := fmt.Sprintf("mr-out-%d", task.TaskID)
+	ofile, err := os.Create(oname)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer ofile.Close()
+	//iterate over all similar keys then reduce
+	for i := 0; i < len(intermediate); {
+		j := i + 1
+		for ; j < len(intermediate) && intermediate[j].Key == intermediate[i].Key; j++ {
+
+		}
+		values := []string{}
+		for k := i; k < j; k++ {
+			values = append(values, intermediate[k].Value)
+		}
+		//TODO delete intermediate files if task was successful
+		output := reducef(intermediate[i].Key, values)
+		//write keys to output files on each iteration
+		fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
+		i = j
 	}
 }
 
@@ -160,6 +166,7 @@ func CallExample() {
 }
 
 func CallRegisterWorker() (int, error) {
+	log.Println("registering worker")
 	var id int
 	ok := call("Coordinator.RegisterWorker", ExampleArgs{}, &id)
 	if ok {
@@ -168,6 +175,7 @@ func CallRegisterWorker() (int, error) {
 	return 0, errors.New("unable to register worker")
 }
 func CallFetchTask() (Task, error) {
+	log.Println("fetching task")
 	args := workerID
 	task := Task{}
 
@@ -179,6 +187,7 @@ func CallFetchTask() (Task, error) {
 }
 
 func CallCompleteTask(completedTask Task) error {
+	log.Println("completing task")
 	reply := Task{}
 	ok := call("Coordinator.CompleteTask", completedTask, &reply)
 	if ok {
@@ -223,14 +232,6 @@ func LoadFile(filename string) string {
 	file.Close()
 	return string(content)
 }
-
-func MapFile(filename, contents string, mapf func(string, string) []KeyValue) []KeyValue {
-	return mapf(filename, contents)
-}
-
-//func ReduceFile(key string, values []string, reducef func(string, []string) string) string {
-//	return reducef(key, values)
-//}
 
 func HashIntermediates(nReduce int, intermediate []KeyValue) [][]KeyValue {
 	hashedIm := make([][]KeyValue, nReduce)

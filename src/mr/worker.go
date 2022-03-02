@@ -100,8 +100,10 @@ func reduceTask(task Task, reducef func(string, []string) string) {
 	log.Printf("starting reduce task %d\n", task.TaskID)
 	//load nReduce files
 	intermediate := []KeyValue{}
+	var inputFiles []string
 	for i := 0; i < task.MMap; i++ {
 		iname := fmt.Sprintf("mr-%d-%d", i, task.TaskID)
+		inputFiles = append(inputFiles, iname)
 		ifile, err := os.Open(iname)
 		defer ifile.Close()
 		if err != nil {
@@ -134,6 +136,19 @@ func reduceTask(task Task, reducef func(string, []string) string) {
 		//write keys to output files on each iteration
 		fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
 		i = j
+	}
+	go removeMapFiles(inputFiles)
+}
+
+func removeMapFiles(files []string) {
+	log.Println("removing intermediate map files")
+	for _, file := range files {
+		err := os.Remove(file)
+		if err != nil {
+			//if remove fails, just log it and exit
+			log.Println(err)
+			break
+		}
 	}
 }
 

@@ -107,7 +107,9 @@ func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
 	if task.State != StateInProgress {
 		return fmt.Errorf("only a task InProgress can be marked completed")
 	}
+	c.mu.Lock()
 	task.State = StateCompleted
+	c.mu.Unlock()
 	//c.MapTasks[completedTask.TaskID].State = StateCompleted
 	return nil
 

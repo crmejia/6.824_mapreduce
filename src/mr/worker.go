@@ -9,6 +9,7 @@ import (
 	"net/rpc"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 import "log"
@@ -48,33 +49,50 @@ func Worker(mapf func(string, string) []KeyValue,
 	}
 	for {
 		task, err := CallFetchTask()
+		var renames []fileRename
 		if err != nil { //as per the hint this might mean that the work is done and workers can exit
 			//TODO maybe not return but sleep?
-			time.Sleep(time.Second)
+			time.Sleep(500 * time.Millisecond)
 			//the only errors from fetch task are unregistered worker and no idle task atm
 			//fmt.Println(err.Error())
-			return
-		}
+			//return
+		} else {
+			if task.TaskType == TaskTypeMap {
+				buckets := mapTask(task, mapf)
+				renames = writeReduceFiles(buckets, task.TaskID)
+			} else { //reduce task
+				intermediate := LoadReduceTaskFiles(task)
+				buffer := reduceTask(intermediate, reducef)
+				renames = writeOutput(buffer, task.TaskID)
 
-		if task.TaskType == TaskTypeMap {
-			mapTask(task, mapf)
-		} else { //reduce task
-			reduceTask(task, reducef)
-		}
+				//TODO only do this once reduce is completed
+				go removeMapFiles(task)
+				//TODO goRemoveReduceFiles
+			}
 
-		err = CallCompleteTask(task)
-		if err != nil {
-			// Assume the worker took too long. Try to Re-register
-			workerID, err = CallRegisterWorker()
+			for _, r := range renames {
+				os.Rename(r.tmpFile.Name(), r.name)
+			}
+
+			err = CallCompleteTask(task)
 			if err != nil {
-				//assume the coordinator is Done, exit
-				return
+				// Assume the worker took too long. Try to Re-register
+				workerID, err = CallRegisterWorker()
+				if err != nil {
+					//assume the coordinator is Done, exit
+					return
+				}
 			}
 		}
 	}
 }
 
-func mapTask(task Task, mapf func(string, string) []KeyValue) {
+//map and reduce are interesting functions to write. I did not TDD but instead "copied"
+// the way sequential-mr does. So now, while refactoring, I've realized that they do more thatn
+// one thing. Map task does mapping and writing so I'm splitting it. Reduce does three things:
+// loads files, reduce, write file. So once again I'm going to split. Hopefully, I can write a
+//write file simple enough that it can be atomic and reusable.
+func mapTask(task Task, mapf func(string, string) []KeyValue) [][]KeyValue {
 	log.Printf("starting map task %d\n", task.TaskID)
 	contents := LoadFile(task.Filename)
 	//open file into a content and close
@@ -83,20 +101,35 @@ func mapTask(task Task, mapf func(string, string) []KeyValue) {
 	intermediate := mapf(task.Filename, contents)
 	sort.Sort(ByKey(intermediate))
 	buckets := HashIntermediates(task.NReduce, intermediate)
-	for i, bucket := range buckets {
-		oname := fmt.Sprintf("mr-%d-%d", task.TaskID, i) //mr-X-Y
-		//TODO todo use tmpfile os.CreateTemp then rename
-		ofile, err := os.Create(oname)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-		defer ofile.Close()
-		WriteReduceFiles(bucket, ofile)
-	}
+	return buckets
 }
 
-func reduceTask(task Task, reducef func(string, []string) string) {
+//for renaming atomically
+type fileRename struct {
+	tmpFile *os.File
+	name    string
+}
+
+func writeReduceFiles(buckets [][]KeyValue, taskID int) []fileRename {
+	rename := []fileRename{}
+	for i, bucket := range buckets {
+		oname := fmt.Sprintf("mr-%d-%d", taskID, i) //mr-X-Y
+		//TODO todo use tmpfile os.CreateTemp then rename
+		ofile, err := os.CreateTemp("", oname)
+		if err != nil {
+			fmt.Println(err.Error())
+			return []fileRename{}
+		}
+		defer ofile.Close()
+		//queue file rename
+		fRename := fileRename{tmpFile: ofile, name: oname}
+		rename = append(rename, fRename)
+		EncodeReduceFiles(bucket, ofile)
+	}
+	return rename
+}
+
+func LoadReduceTaskFiles(task Task) []KeyValue {
 	log.Printf("starting reduce task %d\n", task.TaskID)
 	//load nReduce files
 	intermediate := []KeyValue{}
@@ -108,20 +141,24 @@ func reduceTask(task Task, reducef func(string, []string) string) {
 		defer ifile.Close()
 		if err != nil {
 			fmt.Println(err.Error())
-			return
+			return intermediate
 		}
 		bucket := ReadReduceFile(ifile)
 		intermediate = append(intermediate, bucket...)
 	}
+	return intermediate
+}
 
-	oname := fmt.Sprintf("mr-out-%d", task.TaskID)
-	ofile, err := os.Create(oname)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	defer ofile.Close()
+func reduceTask(intermediate []KeyValue, reducef func(string, []string) string) string {
+	//oname := fmt.Sprintf("mr-out-%d", task.TaskID)
+	//ofile, err := os.Create(oname)
+	//if err != nil {
+	//	fmt.Println(err.Error())
+	//	return
+	//}
+	//defer ofile.Close()
 	//iterate over all similar keys then reduce
+	output := strings.Builder{}
 	for i := 0; i < len(intermediate); {
 		j := i + 1
 		for ; j < len(intermediate) && intermediate[j].Key == intermediate[i].Key; j++ {
@@ -131,19 +168,39 @@ func reduceTask(task Task, reducef func(string, []string) string) {
 		for k := i; k < j; k++ {
 			values = append(values, intermediate[k].Value)
 		}
-		//TODO delete intermediate files if task was successful
-		output := reducef(intermediate[i].Key, values)
-		//write keys to output files on each iteration
-		fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
+
+		reduceOutput := reducef(intermediate[i].Key, values)
+		//write keys to reduceOutput files on each iteration
+		fmt.Fprintf(&output, "%v %v\n", intermediate[i].Key, reduceOutput)
+		//fmt.Fprintf(output, "%v %v\n", intermediate[i].Key, reduceOutput)
 		i = j
 	}
-	go removeMapFiles(inputFiles)
+	return output.String()
 }
 
-func removeMapFiles(files []string) {
+func writeOutput(output string, taskID int) []fileRename {
+	oname := fmt.Sprintf("mr-out-%d", taskID)
+	ofile, err := os.CreateTemp("", oname)
+	var rename []fileRename
+	if err != nil {
+		fmt.Println(err.Error())
+		return rename
+	}
+
+	defer ofile.Close()
+	fmt.Fprintf(ofile, output)
+	r := fileRename{
+		tmpFile: ofile,
+		name:    oname}
+	rename = append(rename, r)
+	return rename
+}
+
+func removeMapFiles(task Task) {
 	log.Println("removing intermediate map files")
-	for _, file := range files {
-		err := os.Remove(file)
+	for i := 0; i < task.MMap; i++ {
+		iname := fmt.Sprintf("mr-%d-%d", i, task.TaskID)
+		err := os.Remove(iname)
 		if err != nil {
 			//if remove fails, just log it and exit
 			log.Println(err)
@@ -260,7 +317,7 @@ func HashIntermediates(nReduce int, intermediate []KeyValue) [][]KeyValue {
 	return hashedIm
 }
 
-func WriteReduceFiles(bucket []KeyValue, w io.Writer) error {
+func EncodeReduceFiles(bucket []KeyValue, w io.Writer) error {
 	enc := json.NewEncoder(w)
 	for _, kv := range bucket {
 		if err := enc.Encode(kv); err != nil {

@@ -68,6 +68,7 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 			c.MapTasks[i].WorkerID = workerID
 			c.MapTasks[i].State = StateInProgress
 			c.mu.Unlock()
+			mapDone = false
 			return nil
 		} else if t.State == StateInProgress {
 			mapDone = false

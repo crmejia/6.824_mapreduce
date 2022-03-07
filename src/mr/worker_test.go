@@ -76,7 +76,7 @@ func TestMapTaskCreatesNReduceFiles(t *testing.T) {
 	//{"Key":"A","Value":"1"}
 	//{"Key":"A","Value":"1"}
 	buffer := bytes.Buffer{} //io.writer
-	mr.WriteReduceFiles(bucket, &buffer)
+	mr.EncodeReduceFiles(bucket, &buffer)
 
 	got := string(buffer.Bytes())
 	if want != got {

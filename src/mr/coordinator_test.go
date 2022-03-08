@@ -102,6 +102,11 @@ func TestFetchTaskReturnsReduceTaskIfAllMapTaskAreCompleted(t *testing.T) {
 //		t.Errorf("want WorkerID to be set > 0")
 //	}
 //}
+//TODO test the behavior of retrieving a task from a list task
+//sets starttime, state
+func TestRetrievingTask(t *testing.T) {
+
+}
 
 //TestFetchReduceTaskFailsIfMapTasksNotComplete
 func TestCompleteTaskSetsStateCompleted(t *testing.T) {

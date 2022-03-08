@@ -56,6 +56,7 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 		return errors.New("unregistered ID, please call RegisterWorker")
 	}
 	mapDone := true //flag that marks if map tasks are done
+	//TODO iterate over state of all task instead of task themselves
 	for i, t := range c.MapTasks {
 		if t.State == StateIdle {
 			//TODO having to "copy" values manually is annoying, is there a better way
@@ -67,6 +68,7 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 			c.mu.Lock()
 			c.MapTasks[i].WorkerID = workerID
 			c.MapTasks[i].State = StateInProgress
+			c.MapTasks[i].StartTime = time.Now()
 			c.mu.Unlock()
 			mapDone = false
 			return nil
@@ -86,6 +88,7 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 			c.mu.Lock()
 			c.ReduceTask[i].WorkerID = workerID
 			c.ReduceTask[i].State = StateInProgress
+			c.ReduceTask[i].StartTime = time.Now()
 			c.mu.Unlock()
 			return nil
 		}
@@ -99,7 +102,6 @@ func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
 	//lookup the task on the appropriate list
 	if completedTask.TaskType == TaskTypeMap {
 		task = &c.MapTasks[completedTask.TaskID]
-
 	} else { //reduce tasks
 		task = &c.ReduceTask[completedTask.TaskID]
 	}
@@ -110,6 +112,7 @@ func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
 	if task.State != StateInProgress {
 		return fmt.Errorf("only a task InProgress can be marked completed")
 	}
+
 	c.mu.Lock()
 	task.State = StateCompleted
 	c.mu.Unlock()
@@ -195,6 +198,7 @@ func (c *Coordinator) checkTask() {
 
 //loop over in progress task and reset long running jobs
 func (c *Coordinator) CheckTask() {
+	//TODO also check reduce task
 	for i, t := range c.MapTasks {
 		if t.State == StateInProgress {
 			now := time.Now()
@@ -204,6 +208,25 @@ func (c *Coordinator) CheckTask() {
 				c.mu.Lock()
 				//t.State = StateIdle doesn't modify
 				c.MapTasks[i].State = StateIdle
+				wID := c.MapTasks[i].WorkerID
+				c.MapTasks[i].WorkerID = 0
+				c.Workers[wID] = false
+				c.mu.Unlock()
+			}
+		}
+	}
+	for i, t := range c.ReduceTask {
+		if t.State == StateInProgress {
+			now := time.Now()
+			elapsed := now.Sub(t.StartTime)
+			if elapsed > (10 * time.Second) {
+				//resetting task
+				c.mu.Lock()
+				//t.State = StateIdle doesn't modify
+				c.ReduceTask[i].State = StateIdle
+				wID := c.ReduceTask[i].WorkerID
+				c.ReduceTask[i].WorkerID = 0
+				c.Workers[wID] = false
 				c.mu.Unlock()
 			}
 		}

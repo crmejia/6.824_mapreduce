@@ -32,11 +32,11 @@ const (
 	StateCompleted
 )
 
-var validState = map[State]bool{
-	StateIdle:       true,
-	StateInProgress: true,
-	StateCompleted:  true,
-}
+//var validState = map[State]bool{
+//	StateIdle:       true,
+//	StateInProgress: true,
+//	StateCompleted:  true,
+//}
 
 type TaskType int
 

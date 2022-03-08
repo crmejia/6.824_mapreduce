@@ -65,9 +65,8 @@ func Worker(mapf func(string, string) []KeyValue,
 				buffer := reduceTask(intermediate, reducef)
 				renames = writeOutput(buffer, task.TaskID)
 
-				//TODO only do this once reduce is completed
+				//only do this once reduce is completed
 				go removeMapFiles(task)
-				//TODO goRemoveReduceFiles
 			}
 
 			for _, r := range renames {
@@ -76,6 +75,7 @@ func Worker(mapf func(string, string) []KeyValue,
 
 			err = CallCompleteTask(task)
 			if err != nil {
+				log.Println(err)
 				// Assume the worker took too long. Try to Re-register
 				workerID, err = CallRegisterWorker()
 				if err != nil {
@@ -114,7 +114,6 @@ func writeReduceFiles(buckets [][]KeyValue, taskID int) []fileRename {
 	rename := []fileRename{}
 	for i, bucket := range buckets {
 		oname := fmt.Sprintf("mr-%d-%d", taskID, i) //mr-X-Y
-		//TODO todo use tmpfile os.CreateTemp then rename
 		ofile, err := os.CreateTemp("", oname)
 		if err != nil {
 			fmt.Println(err.Error())

@@ -55,7 +55,7 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 	if !c.Workers[workerID] {
 		return errors.New("unregistered ID, please call RegisterWorker")
 	}
-	mapDone := true //flag that marks if map task are done
+	mapDone := true //flag that marks if map tasks are done
 	for i, t := range c.MapTasks {
 		if t.State == StateIdle {
 			//TODO having to "copy" values manually is annoying, is there a better way
@@ -96,12 +96,14 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 
 func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
 	var task *Task
+	//lookup the task on the appropriate list
 	if completedTask.TaskType == TaskTypeMap {
 		task = &c.MapTasks[completedTask.TaskID]
 
 	} else { //reduce tasks
 		task = &c.ReduceTask[completedTask.TaskID]
 	}
+
 	if task.WorkerID != completedTask.WorkerID {
 		return fmt.Errorf("only assigned worker can complete task")
 	}
@@ -187,7 +189,7 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 func (c *Coordinator) checkTask() {
 	for {
 		c.CheckTask()
-		time.Sleep(30 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
@@ -197,7 +199,7 @@ func (c *Coordinator) CheckTask() {
 		if t.State == StateInProgress {
 			now := time.Now()
 			elapsed := now.Sub(t.StartTime)
-			if elapsed > (10 * time.Minute) {
+			if elapsed > (10 * time.Second) {
 				//resetting task
 				c.mu.Lock()
 				//t.State = StateIdle doesn't modify

@@ -49,7 +49,6 @@ func Worker(mapf func(string, string) []KeyValue,
 	}
 	for {
 		task, err := CallFetchTask()
-		var renames []fileRename
 		if err != nil { //as per the hint this might mean that the work is done and workers can exit
 			//TODO maybe not return but sleep?
 			time.Sleep(500 * time.Millisecond)
@@ -57,6 +56,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			//fmt.Println(err.Error())
 			//return
 		} else {
+			var renames []fileRename
 			if task.TaskType == TaskTypeMap {
 				buckets := mapTask(task, mapf)
 				renames = writeReduceFiles(buckets, task.TaskID)

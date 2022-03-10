@@ -95,11 +95,7 @@ func Worker(mapf func(string, string) []KeyValue,
 func mapTask(task Task, mapf func(string, string) []KeyValue) [][]KeyValue {
 	log.Printf("starting map task %d\n", task.TaskID)
 	contents := LoadFile(task.Filename)
-	//open file into a content and close
-	//call map on content
-	//intermediate := MapFile(task.Filename, contents, mapf)
 	intermediate := mapf(task.Filename, contents)
-	sort.Sort(ByKey(intermediate))
 	buckets := HashIntermediates(task.NReduce, intermediate)
 	return buckets
 }
@@ -145,18 +141,11 @@ func LoadReduceTaskFiles(task Task) []KeyValue {
 		bucket := ReadReduceFile(ifile)
 		intermediate = append(intermediate, bucket...)
 	}
+	sort.Sort(ByKey(intermediate))
 	return intermediate
 }
 
 func reduceTask(intermediate []KeyValue, reducef func(string, []string) string) string {
-	//oname := fmt.Sprintf("mr-out-%d", task.TaskID)
-	//ofile, err := os.Create(oname)
-	//if err != nil {
-	//	fmt.Println(err.Error())
-	//	return
-	//}
-	//defer ofile.Close()
-	//iterate over all similar keys then reduce
 	output := strings.Builder{}
 	for i := 0; i < len(intermediate); {
 		j := i + 1

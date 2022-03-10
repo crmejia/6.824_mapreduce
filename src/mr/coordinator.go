@@ -56,6 +56,10 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 		return errors.New("unregistered ID, please call RegisterWorker")
 	}
 	mapDone := true //flag that marks if map tasks are done
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	//TODO iterate over state of all task instead of task themselves
 	for i, t := range c.MapTasks {
 		if t.State == StateIdle {
@@ -65,11 +69,9 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 			task.WorkerID = workerID
 			task.TaskType = t.TaskType
 			task.NReduce = t.NReduce
-			c.mu.Lock()
 			c.MapTasks[i].WorkerID = workerID
 			c.MapTasks[i].State = StateInProgress
 			c.MapTasks[i].StartTime = time.Now()
-			c.mu.Unlock()
 			mapDone = false
 			return nil
 		} else if t.State == StateInProgress {
@@ -85,11 +87,9 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 			task.TaskType = t.TaskType
 			task.MMap = t.MMap
 			task.NReduce = t.NReduce
-			c.mu.Lock()
 			c.ReduceTask[i].WorkerID = workerID
 			c.ReduceTask[i].State = StateInProgress
 			c.ReduceTask[i].StartTime = time.Now()
-			c.mu.Unlock()
 			return nil
 		}
 	}

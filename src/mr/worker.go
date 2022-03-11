@@ -295,9 +295,6 @@ func LoadFile(filename string) string {
 
 func HashIntermediates(nReduce int, intermediate []KeyValue) [][]KeyValue {
 	hashedIm := make([][]KeyValue, nReduce)
-	//for i, _ := range hashedIm {
-	//	hashedIm[i] := make([]KeyValue, 0)
-	//}
 	for _, v := range intermediate {
 		targetBucket := ihash(v.Key) % nReduce
 		hashedIm[targetBucket] = append(hashedIm[targetBucket], v)

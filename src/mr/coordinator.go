@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -125,10 +126,20 @@ func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
 // start a thread that listens for RPCs from worker.go
 //
 func (c *Coordinator) server() {
-	rpc.Register(c)
-	rpc.HandleHTTP()
+	server := rpc.NewServer()
+	err := server.Register(c)
+	if err != nil {
+		log.Fatal(err)
+	}
+	rand.Seed(time.Now().UnixNano())
+	id := rand.Int()
+	rpcPath := fmt.Sprintf("/_goRPC_%d", id)
+	rpcDebugPath := fmt.Sprintf("/debug/rpc_%d", id)
+	server.HandleHTTP(rpcPath, rpcDebugPath)
+
 	//l, e := net.Listen("tcp", ":1234")
 	sockname := coordinatorSock()
+	sockname += strconv.Itoa(id)
 	os.Remove(sockname)
 	l, e := net.Listen("unix", sockname)
 	if e != nil {
@@ -181,7 +192,6 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 		c.ReduceTask[i].MMap = mMap
 		c.ReduceTask[i].NReduce = nReduce
 	}
-	fmt.Println("coordinator created")
 	c.server()
 	go c.checkTask()
 	return &c

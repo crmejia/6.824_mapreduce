@@ -145,7 +145,7 @@ func TestCompleteTaskFailsForNonInProgressState(t *testing.T) {
 	}
 }
 func TestMakeCoordinator(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 	files := []string{"file", "file"}
 	nReduce := 3
 	c := mr.MakeCoordinator(files, nReduce)
@@ -164,8 +164,8 @@ func TestMakeCoordinator(t *testing.T) {
 }
 
 func TestMakeCoordinatorCreatesIdleTasks(t *testing.T) {
-	t.Skip()
-	t.Parallel()
+	//t.Skip()
+	//t.Parallel()
 	files := []string{"file", "file"}
 	nReduce := 3
 	c := mr.MakeCoordinator(files, nReduce)
@@ -186,7 +186,6 @@ func TestMakeCoordinatorCreatesIdleTasks(t *testing.T) {
 }
 
 func TestMakeCoordinatorSetsTasksType(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 	files := []string{"file", "file"}
 	nReduce := 3
@@ -208,7 +207,6 @@ func TestMakeCoordinatorSetsTasksType(t *testing.T) {
 }
 
 func TestMakeCoordinatorSetsFilenameOnMapTask(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 	files := []string{"file", "file"}
 	nReduce := 3

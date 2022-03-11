@@ -7,6 +7,7 @@ package mr
 //
 
 import (
+	"fmt"
 	"os"
 	"time"
 )
@@ -31,6 +32,19 @@ const (
 	StateInProgress
 	StateCompleted
 )
+
+func (s State) String() string {
+	switch s {
+	case StateIdle:
+		return fmt.Sprint("idle")
+	case StateInProgress:
+		return fmt.Sprint("in-progress")
+	case StateCompleted:
+		return fmt.Sprint("completed")
+	default:
+		return fmt.Sprintf("%d", s)
+	}
+}
 
 //var validState = map[State]bool{
 //	StateIdle:       true,

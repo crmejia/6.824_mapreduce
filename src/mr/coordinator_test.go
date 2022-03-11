@@ -9,7 +9,7 @@ import (
 const workerID = 17
 
 func TestFetchTask(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 	want := "filename"
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
@@ -29,7 +29,7 @@ func TestFetchTask(t *testing.T) {
 }
 
 func TestFetchTaskNoMoreTaskAvailableReturnsError(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		MapTasks: []mr.Task{
@@ -45,7 +45,7 @@ func TestFetchTaskNoMoreTaskAvailableReturnsError(t *testing.T) {
 }
 
 func TestFetchTaskSetsTaskID(t *testing.T) {
-	want := 1
+	t.Parallel()
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		MapTasks: []mr.Task{
@@ -56,6 +56,7 @@ func TestFetchTaskSetsTaskID(t *testing.T) {
 	task := mr.Task{}
 	coordinator.FetchTask(workerID, &task)
 	coordinator.FetchTask(workerID, &task)
+	want := 1
 	got := task.TaskID
 	if want != got {
 		t.Errorf("want %d, got %d", want, got)
@@ -63,7 +64,7 @@ func TestFetchTaskSetsTaskID(t *testing.T) {
 }
 
 func TestFetchTaskReturnsReduceTaskIfAllMapTaskAreCompleted(t *testing.T) {
-	want := mr.TaskTypeReduce
+	t.Parallel()
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		MapTasks: []mr.Task{
@@ -78,46 +79,25 @@ func TestFetchTaskReturnsReduceTaskIfAllMapTaskAreCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatal()
 	}
+	want := mr.TaskTypeReduce
 	got := task.TaskType
 	if want != got {
 		t.Errorf("want %d, got %d", want, got)
 	}
 }
 
-//no longer needed there is a Register method
-//func TestFetchTaskAssignsIDToWorker(t *testing.T) {
-//	//want := "filename"
-//	coordinator := mr.Coordinator{
-//		MapTasks: []mr.Task{
-//			mr.Task{},
-//		},
-//	}
-//	task := mr.Task{}
-//	err := coordinator.FetchTask(0, &task)
-//	if err != nil {
-//		t.Fatal()
-//	}
-//	got := task.WorkerID
-//	if got == 0 {
-//		t.Errorf("want WorkerID to be set > 0")
-//	}
-//}
-//TODO test the behavior of retrieving a task from a list task
-//sets starttime, state
-func TestRetrievingTask(t *testing.T) {
-
-}
-
-//TestFetchReduceTaskFailsIfMapTasksNotComplete
 func TestCompleteTaskSetsStateCompleted(t *testing.T) {
-	want := mr.StateCompleted
+	t.Parallel()
+	t.Skip("rethinking Task.TaskID")
+	taskID := 44
 	coordinator := mr.Coordinator{
 		Workers:    map[int]bool{workerID: true},
-		MapTasks:   []mr.Task{{WorkerID: workerID, State: mr.StateInProgress}},
-		ReduceTask: []mr.Task{{WorkerID: workerID, State: mr.StateInProgress}},
+		MapTasks:   []mr.Task{{TaskID: taskID, WorkerID: workerID, State: mr.StateInProgress}},
+		ReduceTask: []mr.Task{{TaskID: taskID, WorkerID: workerID, State: mr.StateInProgress}},
 	}
-	task := mr.Task{WorkerID: workerID, TaskType: mr.TaskTypeMap}
+	task := mr.Task{TaskID: taskID, WorkerID: workerID, TaskType: mr.TaskTypeMap}
 	coordinator.CompleteTask(task, nil)
+	want := mr.StateCompleted
 	got := coordinator.MapTasks[0].State
 	if want != got {
 		t.Errorf("want Task.StateCompleted %d, got State %d", want, got)
@@ -132,19 +112,20 @@ func TestCompleteTaskSetsStateCompleted(t *testing.T) {
 }
 
 func TestCompleteTaskFailsForWrongWorker(t *testing.T) {
-	want := mr.StateInProgress
+	t.Parallel()
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{workerID: true},
 		MapTasks: []mr.Task{
-			{WorkerID: workerID},
+			{WorkerID: workerID, State: mr.StateInProgress},
 		},
 	}
-	task := mr.Task{}                      //worker ID not set
-	coordinator.FetchTask(workerID, &task) //coordinator sets task to inprogress
+	task := mr.Task{} //worker ID not set
 	err := coordinator.CompleteTask(task, nil)
 	if err == nil {
 		t.Errorf("want error if wrong worker call CompleteTask, got nil")
 	}
+
+	want := mr.StateInProgress
 	got := coordinator.MapTasks[0].State
 	if want != got {
 		t.Errorf("want Task.StateInProgress %d, got State %d", want, got)
@@ -152,6 +133,7 @@ func TestCompleteTaskFailsForWrongWorker(t *testing.T) {
 }
 
 func TestCompleteTaskFailsForNonInProgressState(t *testing.T) {
+	t.Parallel()
 	coordinator := mr.Coordinator{
 		Workers:  map[int]bool{workerID: true},
 		MapTasks: []mr.Task{{WorkerID: workerID, State: mr.StateIdle}},
@@ -163,20 +145,27 @@ func TestCompleteTaskFailsForNonInProgressState(t *testing.T) {
 	}
 }
 func TestMakeCoordinator(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 	files := []string{"file", "file"}
 	nReduce := 3
-	want := len(files) + nReduce
 	c := mr.MakeCoordinator(files, nReduce)
 
+	want := len(files)
 	got := len(c.MapTasks)
+	if want != got {
+		t.Errorf("want %d MapTasks, got %d", want, got)
+	}
+
+	want = nReduce
+	got = len(c.ReduceTask)
 	if want != got {
 		t.Errorf("want %d MapTasks, got %d", want, got)
 	}
 }
 
 func TestMakeCoordinatorCreatesIdleTasks(t *testing.T) {
-	//t.Parallel()
+	t.Skip()
+	t.Parallel()
 	files := []string{"file", "file"}
 	nReduce := 3
 	c := mr.MakeCoordinator(files, nReduce)
@@ -197,7 +186,8 @@ func TestMakeCoordinatorCreatesIdleTasks(t *testing.T) {
 }
 
 func TestMakeCoordinatorSetsTasksType(t *testing.T) {
-	//t.Parallel()
+	t.Skip()
+	t.Parallel()
 	files := []string{"file", "file"}
 	nReduce := 3
 	c := mr.MakeCoordinator(files, nReduce)
@@ -218,6 +208,8 @@ func TestMakeCoordinatorSetsTasksType(t *testing.T) {
 }
 
 func TestMakeCoordinatorSetsFilenameOnMapTask(t *testing.T) {
+	t.Skip()
+	t.Parallel()
 	files := []string{"file", "file"}
 	nReduce := 3
 	c := mr.MakeCoordinator(files, nReduce)
@@ -232,6 +224,7 @@ func TestMakeCoordinatorSetsFilenameOnMapTask(t *testing.T) {
 }
 
 func TestRegisterWorker(t *testing.T) {
+	t.Parallel()
 	coordinator := mr.Coordinator{
 		Workers: map[int]bool{},
 	}
@@ -247,6 +240,7 @@ func TestRegisterWorker(t *testing.T) {
 
 //func TestCoordinator loops over tasks and "resets" long running task to idle
 func TestCoordinatorResetsStaleTask(t *testing.T) {
+	t.Parallel()
 	coordinator := mr.Coordinator{
 		MapTasks: []mr.Task{
 			{
@@ -272,3 +266,8 @@ func TestCoordinatorResetsStaleTask(t *testing.T) {
 // and the old workers comes back.
 
 //test coordinator sets filename of reduce task
+
+//test the behavior of retrieving a task from a list task
+//sets starttime, state
+
+//TestFetchReduceTaskFailsIfMapTasksNotComplete

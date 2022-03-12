@@ -7,7 +7,6 @@ package mr
 //
 
 import (
-	"fmt"
 	"os"
 	"time"
 )
@@ -33,24 +32,15 @@ const (
 	StateCompleted
 )
 
-func (s State) String() string {
-	switch s {
-	case StateIdle:
-		return fmt.Sprint("idle")
-	case StateInProgress:
-		return fmt.Sprint("in-progress")
-	case StateCompleted:
-		return fmt.Sprint("completed")
-	default:
-		return fmt.Sprintf("%d", s)
-	}
+var stateStringMap = map[State]string{
+	StateIdle:       "idle",
+	StateInProgress: "in-progress",
+	StateCompleted:  "completed",
 }
 
-//var validState = map[State]bool{
-//	StateIdle:       true,
-//	StateInProgress: true,
-//	StateCompleted:  true,
-//}
+func (s State) String() string {
+	return stateStringMap[s]
+}
 
 type TaskType int
 
@@ -58,6 +48,16 @@ const (
 	TaskTypeMap TaskType = iota
 	TaskTypeReduce
 )
+
+var taskTypeStringMap = map[TaskType]string{
+	TaskTypeMap:    "map task",
+	TaskTypeReduce: "reduce task",
+}
+
+func (t TaskType) String() string {
+	return taskTypeStringMap[t]
+
+}
 
 // Add your RPC definitions here.
 type Task struct {
@@ -72,15 +72,6 @@ type Task struct {
 	MMap      int
 	NReduce   int
 }
-
-//
-//func (t Task) State() State {
-//	return t.State
-//}
-
-//func (t Task) NReduce() int {
-//	return t.NReduce
-//}
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the coordinator.

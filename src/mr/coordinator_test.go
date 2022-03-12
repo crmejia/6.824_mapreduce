@@ -82,12 +82,13 @@ func TestFetchTaskReturnsReduceTaskIfAllMapTaskAreCompleted(t *testing.T) {
 	want := mr.TaskTypeReduce
 	got := task.TaskType
 	if want != got {
-		t.Errorf("want %d, got %d", want, got)
+		t.Errorf("want %q, got %q", want, got)
 	}
 }
 
 func TestCompleteTaskSetsStateCompleted(t *testing.T) {
 	t.Parallel()
+	//TODO
 	t.Skip("rethinking Task.TaskID")
 	taskID := 44
 	coordinator := mr.Coordinator{
@@ -128,7 +129,7 @@ func TestCompleteTaskFailsForWrongWorker(t *testing.T) {
 	want := mr.StateInProgress
 	got := coordinator.MapTasks[0].State
 	if want != got {
-		t.Errorf("want Task.StateInProgress %d, got State %d", want, got)
+		t.Errorf("want Task.StateInProgress %q, got State %q", want, got)
 	}
 }
 
@@ -173,14 +174,14 @@ func TestMakeCoordinatorCreatesIdleTasks(t *testing.T) {
 	for _, task := range c.MapTasks {
 		got := task.State
 		if mr.StateIdle != got {
-			t.Errorf("want %q, got %d", mr.StateIdle, got)
+			t.Errorf("want %q, got %q", mr.StateIdle, got)
 		}
 	}
 
 	for _, task := range c.ReduceTask {
 		got := task.State
 		if mr.StateIdle != got {
-			t.Errorf("want %q, got %d", mr.StateIdle, got)
+			t.Errorf("want %q, got %q", mr.StateIdle, got)
 		}
 	}
 }
@@ -194,14 +195,14 @@ func TestMakeCoordinatorSetsTasksType(t *testing.T) {
 	for _, task := range c.MapTasks {
 		got := task.TaskType
 		if mr.TaskTypeMap != got {
-			t.Errorf("want %q, got %d", mr.TaskTypeMap, got)
+			t.Errorf("want %q, got %q", mr.TaskTypeMap, got)
 		}
 	}
 
 	for _, task := range c.ReduceTask {
 		got := task.TaskType
 		if mr.TaskTypeReduce != got {
-			t.Errorf("want %q, got %d", mr.TaskTypeReduce, got)
+			t.Errorf("want %q, got %q", mr.TaskTypeReduce, got)
 		}
 	}
 }
@@ -255,7 +256,7 @@ func TestCoordinatorResetsStaleTask(t *testing.T) {
 	want := mr.StateIdle
 	got := coordinator.MapTasks[0].State
 	if want != got {
-		t.Errorf("want task to have an Idle State, got %d", got)
+		t.Errorf("want task to have an %q, got %q", want, got)
 	}
 }
 

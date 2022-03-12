@@ -88,30 +88,56 @@ func TestFetchTaskReturnsReduceTaskIfAllMapTaskAreCompleted(t *testing.T) {
 
 func TestCompleteTaskSetsStateCompleted(t *testing.T) {
 	t.Parallel()
-	//TODO
-	t.Skip("rethinking Task.TaskID")
-	taskID := 44
+	taskID := 1
 	coordinator := mr.Coordinator{
-		Workers:    map[int]bool{workerID: true},
-		MapTasks:   []mr.Task{{TaskID: taskID, WorkerID: workerID, State: mr.StateInProgress}},
-		ReduceTask: []mr.Task{{TaskID: taskID, WorkerID: workerID, State: mr.StateInProgress}},
+		Workers: map[int]bool{workerID: true},
+		MapTasks: []mr.Task{
+			{TaskID: 0, WorkerID: workerID, State: mr.StateInProgress},
+			{TaskID: taskID, WorkerID: workerID, State: mr.StateInProgress}},
+		ReduceTask: []mr.Task{
+			{TaskID: 0, WorkerID: workerID, State: mr.StateInProgress},
+			{TaskID: taskID, WorkerID: workerID, State: mr.StateInProgress}},
 	}
 	task := mr.Task{TaskID: taskID, WorkerID: workerID, TaskType: mr.TaskTypeMap}
 	coordinator.CompleteTask(task, nil)
 	want := mr.StateCompleted
-	got := coordinator.MapTasks[0].State
+	got := coordinator.MapTasks[taskID].State
 	if want != got {
-		t.Errorf("want Task.StateCompleted %d, got State %d", want, got)
+		t.Errorf("want Task.StateCompleted %q, got State %q", want, got)
 	}
 
 	task.TaskType = mr.TaskTypeReduce
 	coordinator.CompleteTask(task, nil)
-	got = coordinator.ReduceTask[0].State
+	got = coordinator.ReduceTask[taskID].State
 	if want != got {
-		t.Errorf("want Task.StateCompleted %d, got State %d", want, got)
+		t.Errorf("want Task.StateCompleted %q, got State %q", want, got)
 	}
 }
 
+func TestCompleteTaskReturnsForOutOfBoundTaskID(t *testing.T) {
+	t.Parallel()
+	taskID := 100
+	coordinator := mr.Coordinator{
+		Workers: map[int]bool{workerID: true},
+		MapTasks: []mr.Task{
+			{TaskID: 0, WorkerID: workerID, State: mr.StateInProgress},
+			{TaskID: taskID, WorkerID: workerID, State: mr.StateInProgress}},
+		ReduceTask: []mr.Task{
+			{TaskID: 0, WorkerID: workerID, State: mr.StateInProgress},
+			{TaskID: taskID, WorkerID: workerID, State: mr.StateInProgress}},
+	}
+	task := mr.Task{TaskID: taskID, WorkerID: workerID, TaskType: mr.TaskTypeMap}
+	err := coordinator.CompleteTask(task, nil)
+	if err == nil {
+		t.Errorf("want error for OutOfBounds ID got nil")
+	}
+
+	task.TaskType = mr.TaskTypeReduce
+	err = coordinator.CompleteTask(task, nil)
+	if err == nil {
+		t.Errorf("want error for OutOfBounds ID got nil")
+	}
+}
 func TestCompleteTaskFailsForWrongWorker(t *testing.T) {
 	t.Parallel()
 	coordinator := mr.Coordinator{

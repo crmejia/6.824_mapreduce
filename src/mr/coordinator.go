@@ -102,8 +102,14 @@ func (c *Coordinator) CompleteTask(completedTask Task, reply *Task) error {
 	var task *Task
 	//lookup the task on the appropriate list
 	if completedTask.TaskType == TaskTypeMap {
+		if completedTask.TaskID > len(c.MapTasks) {
+			return errors.New("out of bounds id")
+		}
 		task = &c.MapTasks[completedTask.TaskID]
 	} else { //reduce tasks
+		if completedTask.TaskID > len(c.ReduceTask) {
+			return errors.New("out of bounds id")
+		}
 		task = &c.ReduceTask[completedTask.TaskID]
 	}
 
@@ -208,7 +214,6 @@ func (c *Coordinator) checkTask() {
 
 //loop over in progress task and reset long running jobs
 func (c *Coordinator) CheckTask() {
-	//TODO also check reduce task
 	for i, t := range c.MapTasks {
 		if t.State == StateInProgress {
 			now := time.Now()

@@ -47,7 +47,6 @@ func TestMapTaskCreatesNReduceFiles(t *testing.T) {
 	}
 }
 
-//TODO test CreateReduceFileError
 func TestLoadReduceFileIntoIntermediate(t *testing.T) {
 
 	want := []mr.KeyValue{

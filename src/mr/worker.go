@@ -50,11 +50,7 @@ func Worker(mapf func(string, string) []KeyValue,
 	for {
 		task, err := CallFetchTask()
 		if err != nil { //as per the hint this might mean that the work is done and workers can exit
-			//TODO maybe not return but sleep?
 			time.Sleep(500 * time.Millisecond)
-			//the only errors from fetch task are unregistered worker and no idle task atm
-			//fmt.Println(err.Error())
-			//return
 		} else {
 			var renames []fileRename
 			if task.TaskType == TaskTypeMap {

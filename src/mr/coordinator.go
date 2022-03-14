@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -65,14 +64,10 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 	for i, t := range c.MapTasks {
 		if t.State == StateIdle {
 			//TODO having to "copy" values manually is annoying, is there a better way
-			task.Filename = t.Filename
-			task.TaskID = t.TaskID
-			task.WorkerID = workerID
-			task.TaskType = t.TaskType
-			task.NReduce = t.NReduce
 			c.MapTasks[i].WorkerID = workerID
 			c.MapTasks[i].State = StateInProgress
 			c.MapTasks[i].StartTime = time.Now()
+			*task = c.MapTasks[i]
 			mapDone = false
 			return nil
 		} else if t.State == StateInProgress {
@@ -82,15 +77,10 @@ func (c *Coordinator) FetchTask(workerID int, task *Task) error {
 
 	for i, t := range c.ReduceTask {
 		if t.State == StateIdle && mapDone {
-			task.Filename = t.Filename
-			task.TaskID = t.TaskID
-			task.WorkerID = workerID
-			task.TaskType = t.TaskType
-			task.MMap = t.MMap
-			task.NReduce = t.NReduce
 			c.ReduceTask[i].WorkerID = workerID
 			c.ReduceTask[i].State = StateInProgress
 			c.ReduceTask[i].StartTime = time.Now()
+			*task = c.ReduceTask[i]
 			return nil
 		}
 	}
@@ -137,15 +127,12 @@ func (c *Coordinator) server() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	rand.Seed(time.Now().UnixNano())
-	id := rand.Int()
-	rpcPath := fmt.Sprintf("/_goRPC_%d", id)
-	rpcDebugPath := fmt.Sprintf("/debug/rpc_%d", id)
+	rpcPath := "/_goRPC_"
+	rpcDebugPath := "/debug/rpc_"
 	server.HandleHTTP(rpcPath, rpcDebugPath)
 
 	//l, e := net.Listen("tcp", ":1234")
 	sockname := coordinatorSock()
-	sockname += strconv.Itoa(id)
 	os.Remove(sockname)
 	l, e := net.Listen("unix", sockname)
 	if e != nil {
@@ -198,9 +185,14 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 		c.ReduceTask[i].MMap = mMap
 		c.ReduceTask[i].NReduce = nReduce
 	}
+	//c.server()
+	//go c.checkTask()
+	return &c
+}
+
+func (c *Coordinator) Run() {
 	c.server()
 	go c.checkTask()
-	return &c
 }
 
 //this is an interesting case for testing. This is an infinite loop that sleeps forever
